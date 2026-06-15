@@ -425,15 +425,22 @@ function mergeState(s){
   if(s.loanInstallments!==undefined) state.loanInstallments=s.loanInstallments;
 }
 
+// ── JSONBIN HEADERS ───────────────────────────────────────────────────────────
+// Envia X-Master-Key E X-Access-Key para funcionar com qualquer tipo de chave
+function jbinHeaders(extra){
+  return Object.assign({'X-Master-Key':JBIN_KEY,'X-Access-Key':JBIN_KEY},extra);
+}
+
 // ── SAVE ─────────────────────────────────────────────────────────────────────
 // 1. localStorage imediato (cache offline-first)
 // 2. JSONBin debounced 800ms
 let _saveTimer=null;
 function saveState(){
   syncStateFromDOM();
-  const json=JSON.stringify(state);
+  const payload=Object.assign({},state,{_ts:Date.now()}); // timestamp para desempate
+  const json=JSON.stringify(payload);
 
-  // localStorage como cache
+  // localStorage como cache imediato
   try{ localStorage.setItem('finCasa_v5',json); }catch(e){}
 
   // JSONBin — só dispara se configurado
@@ -444,28 +451,45 @@ function saveState(){
     try{
       const r=await fetch(JBIN_URL(),{
         method:'PUT',
-        headers:{'X-Master-Key':JBIN_KEY,'Content-Type':'application/json'},
+        headers:jbinHeaders({'Content-Type':'application/json'}),
         body:json
       });
-      setBadge(r.ok?'cloud':'warn');
-    }catch(e){ setBadge('err'); }
+      if(r.ok){ setBadge('cloud'); }
+      else { console.error('JSONBin PUT falhou:',r.status,await r.text()); setBadge('warn'); }
+    }catch(e){ console.error('JSONBin PUT erro:',e); setBadge('err'); }
   },800);
 }
 
 // ── LOAD ─────────────────────────────────────────────────────────────────────
-// 1. tenta JSONBin (fonte de verdade)
-// 2. fallback localStorage
+// Estratégia: carrega localStorage E JSONBin; usa o mais recente (campo _ts).
+// Isso garante que dados locais não sejam perdidos se JSONBin estava desatualizado.
 async function loadState(){
-  if(JBIN_ID&&JBIN_KEY){
-    try{
-      const r=await fetch(JBIN_URL()+'/latest',{headers:{'X-Master-Key':JBIN_KEY}});
-      if(r.ok){ mergeState((await r.json()).record); return; }
-    }catch(e){ console.warn('JSONBin load failed, using localStorage:', e); }
-  }
+  // 1. Carrega localStorage primeiro (rápido, offline-first)
+  let localData=null;
   try{
     const raw=localStorage.getItem('finCasa_v5');
-    if(raw) mergeState(JSON.parse(raw));
-  }catch(e){ console.warn('localStorage load error:', e); }
+    if(raw) localData=JSON.parse(raw);
+  }catch(e){}
+
+  // 2. Tenta JSONBin
+  let cloudData=null;
+  if(JBIN_ID&&JBIN_KEY){
+    try{
+      const r=await fetch(JBIN_URL()+'/latest',{headers:jbinHeaders()});
+      if(r.ok){
+        const body=await r.json();
+        cloudData=body.record;
+        console.log('JSONBin carregado, _ts:',cloudData?._ts);
+      } else { console.warn('JSONBin GET falhou:',r.status); }
+    }catch(e){ console.warn('JSONBin GET erro:',e); }
+  }
+
+  // 3. Usa o mais recente (por _ts); se só um existe, usa esse
+  const localTs = localData?._ts||0;
+  const cloudTs = cloudData?._ts||0;
+  const winner  = (cloudTs>localTs) ? cloudData : (localData||cloudData);
+  console.log(`Fonte: ${cloudTs>localTs?'JSONBin':'localStorage'} (local=${localTs}, cloud=${cloudTs})`);
+  if(winner) mergeState(winner);
 }
 
 // ── EXPORT / IMPORT JSON ─────────────────────────────────────────────────────
@@ -752,30 +776,4 @@ function renderNote({sb,loanAmt,loanRate,loanN,pmt}){
      * Dados salvos automaticamente no navegador.`;
 }
 
-// ── MODAL (despesa e ganho unificados) ───────────────────────────────────────
-let _modalMode='exp'; // 'exp' ou 'inc'
-let _editIdx=-1;
-
-function openModal(mode, idx){
-  _modalMode=mode; _editIdx=idx;
-  const isExp=mode==='exp';
-  const list=isExp?state.expenses:state.extraIncomes;
-
-  document.getElementById('modalTitle').textContent = idx>=0
-    ? (isExp?'✏️ Editar despesa':'✏️ Editar ganho')
-    : (isExp?'➕ Nova despesa':'💰 Novo ganho extra');
-  document.getElementById('labelName').textContent  = isExp?'Nome da despesa':'Descrição do ganho';
-  document.getElementById('labelDate').textContent  = isExp?'Data de início (primeira ocorrência)':'Data do ganho';
-
-  if(idx>=0&&idx<list.length){
-    const e=list[idx];
-    document.getElementById('mName').value=e.name;
-    document.getElementById('mValue').value=e.value;
-    document.getElementById('mDate').value=e.startDate;
-    document.getElementById('mRecurring').checked=e.recurring===true;
-    document.getElementById('mInterval').value=e.intervalDays||30;
-  } else {
-    document.getElementById('mName').value='';
-    document.getElementById('mValue').value='';
-    document.getElementById('mDate').value='';
-    document.getElementById('mRe
+// ── MODAL (despesa e ganho unificados) �
