@@ -146,9 +146,30 @@ input:checked + .slider::before { transform:translateX(18px); background:#fff; }
 .btn-confirm:hover { background:#2a5080; }
 
 .note { padding:12px 32px 24px; font-size:0.72rem; color:#3a3a5a; line-height:1.8; border-top:1px solid #1a1a2e; }
+
+/* PIN LOCK */
+#pinLock { position:fixed; inset:0; background:#0a0a14; z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; }
+#pinLock h2 { color:#e0e0e0; font-size:1.1rem; font-weight:400; letter-spacing:2px; text-transform:uppercase; }
+#pinDots { display:flex; gap:14px; }
+.pin-dot { width:16px; height:16px; border-radius:50%; background:#2a2a4a; border:2px solid #3a3a6a; transition:background .15s; }
+.pin-dot.filled { background:#4a90e2; border-color:#4a90e2; }
+#pinError { color:#f44336; font-size:0.8rem; opacity:0; transition:opacity .3s; height:18px; }
+#pinLock.shake { animation:shake .35s; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)} }
 </style>
 </head>
 <body>
+
+<div id="pinLock">
+  <h2>Digite o PIN</h2>
+  <div id="pinDots">
+    <div class="pin-dot" id="dot0"></div>
+    <div class="pin-dot" id="dot1"></div>
+    <div class="pin-dot" id="dot2"></div>
+    <div class="pin-dot" id="dot3"></div>
+  </div>
+  <div id="pinError">PIN incorreto</div>
+</div>
 
 <div class="save-badge" id="saveBadge">✓ salvo</div>
 
@@ -361,8 +382,8 @@ let state = {
 
 // ── JSONBIN CONFIG ────────────────────────────────────────────────────────────
 // Preencha após criar o bin em jsonbin.io → Settings → X-Master-Key
-const JBIN_ID  = '';   // ex: '6849a1b28a456b796685b123'
-const JBIN_KEY = '';   // ex: '$2a$10$abc...xyz'
+const JBIN_ID  = '6a2f6fb5f5f4af5e29f2c979';  // fin-financas · conta Renato
+const JBIN_KEY = '$2a$10$49Mn9kCZqBvzJnoagv3oqe/fMoSWr10EOLdq21CQnGlsSHWtZvOMm'; // dados_pessoais
 const JBIN_URL = ()=>`https://api.jsonbin.io/v3/b/${JBIN_ID}`;
 
 // ── SYNC DOM → STATE ─────────────────────────────────────────────────────────
@@ -757,39 +778,4 @@ function openModal(mode, idx){
     document.getElementById('mName').value='';
     document.getElementById('mValue').value='';
     document.getElementById('mDate').value='';
-    document.getElementById('mRecurring').checked=isExp; // despesa: default recorrente; ganho: default único
-    document.getElementById('mInterval').value=30;
-  }
-  syncPresets();
-  onRecToggle();
-  document.getElementById('modalOverlay').classList.add('open');
-  setTimeout(()=>document.getElementById('mName').focus(),80);
-}
-
-function closeModal(){ document.getElementById('modalOverlay').classList.remove('open'); }
-
-function onRecToggle(){
-  const rec=document.getElementById('mRecurring').checked;
-  document.getElementById('intervalPanel').classList.toggle('show',rec);
-  if(rec) updateIntervalHint();
-}
-
-function setPreset(days){
-  document.getElementById('mInterval').value=days;
-  syncPresets();
-  updateIntervalHint();
-}
-
-function syncPresets(){
-  const v=parseInt(document.getElementById('mInterval').value)||30;
-  document.querySelectorAll('.preset-btn').forEach(b=>{
-    const bv=parseInt(b.textContent);
-    b.classList.toggle('active',bv===v);
-  });
-  updateIntervalHint();
-}
-
-function updateIntervalHint(){
-  const iv=parseInt(document.getElementById('mInterval').value)||30;
-  const startStr=document.getElementById('mDate').value;
-  let txt=`Repete a cad
+    document.getElementById('mRe
