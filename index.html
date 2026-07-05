@@ -557,11 +557,19 @@ function computeData(){
   });
 
   const sb=parseFloat(document.getElementById('startBalance').value)||0;
-  let bal=sb;
-  wd.forEach(w=>{
-    w.totalOut=w.items.reduce((s,i)=>s+i.v,0);
+  const today=new Date(); today.setHours(0,0,0,0);
+  let todayWeekIdx=-1;
+  for(let i=0;i<N;i++){
+    const ws=new Date(WEEK_STARTS[i]); ws.setHours(0,0,0,0);
+    if(ws<=today) todayWeekIdx=i;
+  }
+  let bal=0;
+  wd.forEach((w,i)=>{
+    w.totalOut=w.items.reduce((s,it)=>s+it.v,0);
     w.net=w.income+w.vrIncome+w.extraIncome+w.loanIncome-w.totalOut;
-    bal+=w.net; w.balance=bal;
+    if(i===todayWeekIdx) bal=sb;
+    bal+=w.net;
+    w.balance=bal;
   });
 
   // ── PASS 2: juros do cheque especial (cobrado no dia 4 de cada mês) ─────────
@@ -804,7 +812,15 @@ function renderTable({wd,loanAmt}){
   table.appendChild(spacer());
 
   // Saldo
-  table.appendChild(mkRow([{cls:'row-label',text:'🏦 Saldo acumulado'},...displayWd.map(w=>({cls:w.balance>2000?'bal-pos':w.balance>=0?'bal-mid':'bal-neg',text:R(w.balance)}))]));
+  const today2=new Date(); today2.setHours(0,0,0,0);
+  let todayIdx2=-1;
+  for(let i=0;i<N;i++){
+    const ws=new Date(WEEK_STARTS[i]); ws.setHours(0,0,0,0);
+    if(ws<=today2) todayIdx2=i;
+  }
+  const startDisplayIdx=Math.max(0, todayIdx2);
+  const isTodayInDisplay=startDisplayIdx>=0 && startDisplayIdx<wd.length;
+  table.appendChild(mkRow([{cls:'row-label',html:'🏦 Saldo<br><span style="font-size:0.65rem;color:#7a7aaa;">'+((isTodayInDisplay&&startDisplayIdx<displayWd.length)?'com base em hoje ↑':'projeção')+'</span>'},...displayWd.map((w,idx)=>({cls:w.balance>2000?'bal-pos':w.balance>=0?'bal-mid':'bal-neg',text:R(w.balance)}))]));
 
   // Margem no cheque especial
   const odLimit = state.overdraftLimit || 11700;
