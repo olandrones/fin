@@ -653,34 +653,64 @@ function renderCompactChart(){
   chart.innerHTML='<div class="zero-line" style="position:absolute;left:0;right:0;border-top:1px dashed #3a3a5a;z-index:0;pointer-events:none;bottom:50%;"></div>';
   monthsContainer.innerHTML='';
 
-  // Renderiza barra de meses
-  const monthBar=document.createElement('div');
-  monthBar.style.cssText='display:flex;flex:1;margin-left:152px;';
-  let lastMonth=-1;
+  // Agrega dados em 13 meses
+  const numMonths=13;
+  const monthBars=Array.from({length:numMonths},()=>({income:0,expense:0,net:0,balance:0}));
   wd.forEach((w,i)=>{
-    const ws=WEEK_STARTS[i];
-    const currentMonth=ws.getMonth();
-    const wrap=document.createElement('div'); wrap.style.cssText='flex:1;border-right:1px solid #2a2a4a;padding:4px 0;text-align:center;font-size:0.65rem;color:#555;';
-    if(currentMonth!==lastMonth){ wrap.textContent=MESES[currentMonth]; lastMonth=currentMonth; }
+    const mIdx=Math.floor(i*12/wd.length);
+    if(mIdx<numMonths){
+      const income=w.income+w.vrIncome+w.extraIncome+w.loanIncome;
+      monthBars[mIdx].income+=income;
+      monthBars[mIdx].expense+=w.totalOut;
+      monthBars[mIdx].net+=w.net;
+    }
+  });
+  const sb=parseFloat(document.getElementById('startBalance').value)||0;
+  let bal=sb;
+  monthBars.forEach(m=>{ bal+=m.net; m.balance=bal; });
+
+  // Renderiza barra de meses (compacta, sem semanas)
+  const monthBar=document.createElement('div');
+  monthBar.style.cssText='display:flex;flex:1;gap:2px;';
+  const mesesCompacto=['Jun','Jul','Ago','Set','Out','Nov','Dez','Jan','Fev','Mar','Abr','Mai','Jun'];
+  mesesCompacto.forEach((m,i)=>{
+    const wrap=document.createElement('div'); wrap.style.cssText='flex:1;padding:4px 0;text-align:center;font-size:0.7rem;color:#555;min-width:32px;';
+    wrap.textContent=m;
     monthBar.appendChild(wrap);
   });
   monthsContainer.appendChild(monthBar);
 
-  const maxPos=Math.max(...wd.map(w=>w.balance),1),maxNeg=Math.abs(Math.min(...wd.map(w=>w.balance),0));
-  const total=maxPos+maxNeg||1,zeroPct=(maxNeg/total)*100;
-  const zl=chart.querySelector('.zero-line');
-  zl.style.bottom=zeroPct+'%';
-  const ref=Math.max(maxPos,maxNeg)||1;
+  // Diverging bars: ganhos acima (verde), gastos abaixo (vermelho)
+  const maxIncome=Math.max(...monthBars.map(m=>m.income),1);
+  const maxExpense=Math.max(...monthBars.map(m=>m.expense),1);
+  const ref=Math.max(maxIncome,maxExpense)||1;
+  const pctBase=50;
 
-  wd.forEach((w,i)=>{
-    const color=w.balance>2000?'#4CAF50':w.balance>=0?'#FFC107':'#f44336';
-    const wrap=document.createElement('div'); wrap.className='bar-wrap';
-    const pct=Math.max(2,(Math.abs(w.balance)/ref)*(w.balance>=0?(100-zeroPct):zeroPct));
-    const bot=w.balance>=0?zeroPct:zeroPct-pct;
-    const bar=document.createElement('div'); bar.className='bar';
-    bar.style.cssText=`height:${pct}%;bottom:${bot}%;background:${color};border-radius:${w.balance>=0?'3px 3px 0 0':'0 0 3px 3px'};`;
-    bar.setAttribute('data-tip',weeks[i].dates+': '+R(w.balance));
-    wrap.appendChild(bar); chart.appendChild(wrap);
+  monthBars.forEach((m,i)=>{
+    const wrap=document.createElement('div');
+    wrap.style.cssText='flex:1;height:100%;position:relative;z-index:1;min-width:32px;';
+
+    const zl=chart.querySelector('.zero-line');
+
+    // Ganhos (verde, pra cima)
+    const incomePct=(m.income/ref)*pctBase;
+    if(incomePct>0.5){
+      const incomeBar=document.createElement('div');
+      incomeBar.style.cssText=`position:absolute;bottom:50%;height:${incomePct}%;width:calc(100% - 2px);left:1px;background:#4CAF50;border-radius:1px 1px 0 0;`;
+      incomeBar.setAttribute('data-tip',`${mesesCompacto[i]}\nGanhos: ${R(m.income)}\nGastos: ${R(m.expense)}\nNet: ${R(m.net)}\nSaldo: ${R(m.balance)}`);
+      wrap.appendChild(incomeBar);
+    }
+
+    // Gastos (vermelho, pra baixo)
+    const expensePct=(m.expense/ref)*pctBase;
+    if(expensePct>0.5){
+      const expenseBar=document.createElement('div');
+      expenseBar.style.cssText=`position:absolute;bottom:calc(50% - ${expensePct}%);height:${expensePct}%;width:calc(100% - 2px);left:1px;background:#f44336;border-radius:0 0 1px 1px;`;
+      expenseBar.setAttribute('data-tip',`${mesesCompacto[i]}\nGanhos: ${R(m.income)}\nGastos: ${R(m.expense)}\nNet: ${R(m.net)}\nSaldo: ${R(m.balance)}`);
+      wrap.appendChild(expenseBar);
+    }
+
+    chart.appendChild(wrap);
   });
 }
 
