@@ -563,12 +563,11 @@ function computeData(){
     const ws=new Date(WEEK_STARTS[i]); ws.setHours(0,0,0,0);
     if(ws<=today) todayWeekIdx=i;
   }
-  let bal=0;
+  let bal=sb;
   wd.forEach((w,i)=>{
     w.totalOut=w.items.reduce((s,it)=>s+it.v,0);
     w.net=w.income+w.vrIncome+w.extraIncome+w.loanIncome-w.totalOut;
-    if(i===todayWeekIdx) bal=sb;
-    bal+=w.net;
+    if(i>todayWeekIdx) bal+=w.net;
     w.balance=bal;
   });
 
@@ -983,7 +982,7 @@ function toggleSim(){
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 (async()=>{
-  await loadState();
+  await loadState(); // Carrega JSONBin primeiro (dados mais recentes)
   document.getElementById('startBalance').value    =state.startBalance;
   document.getElementById('overdraftLimit').value  =state.overdraftLimit;
   document.getElementById('overdraftRate').value   =state.overdraftRate;
@@ -993,7 +992,7 @@ function toggleSim(){
   ['startBalance','overdraftLimit','overdraftRate','loanAmount','loanRate','loanInstallments'].forEach(id=>{
     document.getElementById(id).addEventListener('change',syncStateFromDOM);
   });
-  render();
+  render(); // Renderiza DEPOIS de carregar tudo
 })();
 </script>
 </body>
