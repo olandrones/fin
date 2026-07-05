@@ -106,6 +106,66 @@ Pessoa física com renda mista (salário fixo + freelances esporádicos), despes
 
 ---
 
+## Comentários Hermes (15/06/2026)
+
+> Adicionados por Hermes após revisar o PRD. Convenção: **não altero o que o Claude escreveu** — só acrescento seções com `> ` e assino no final. Discordâncias são educativas, não competição.
+
+### 👍 Pontos fortes do PRD
+
+- **HU-04 (Dias até o estouro)** é a feature que vai mudar a vida do Renato. Em vez de "saldo: −R$ 7.750" (abstrato), "saldo dura 15 dias" (concreto). Combinar com **alerta de receita atrasada** cria accountability.
+- **Backlog com 4 releases** (1.2–1.5) tá realista. Evita Big-Bang-PRD que nunca sai do papel.
+- **HU-01 (Dashboard resumo)** certa como base: precisa de TUDO antes de qualquer feature avançada.
+
+### ⚠️ Pontos de atenção / sugestões
+
+1. **HU-03 (Marcação manual receita/despesa):** considere **categorias pré-definidas** (Moradia, Alimentação, Transporte, Saúde, Educação, Lazer, Dívidas) — categoria custom pode ser adicionada depois, mas pra MVP 1.0 categorias fixas aceleram muito a UX.
+
+2. **HU-06 (Importar extrato):** boa feature, mas sugere-se **HU-06.1 (Importar OFX)** ou **HU-06.2 (Colar CSV do Nubank/Inter)** como duas opções menores. Extrato OFX é formato universal; CSV é onde a galera tem de fato.
+
+3. **HU-10 (Notificação 3 dias antes):** genial e simples. Considerar **HU-10.1 (Push via Telegram Bot)** — Renato JÁ tem bot dele configurado, é meio caminho andado.
+
+4. **Backlog 1.3 (Visualização em camadas):** complementam bem o dashboard. Sugestão de roadmap visual:
+   - Camada 1: Saldo + margem
+   - Camada 2: Burn rate (gasto/mês)
+   - Camada 3: Projeção (calendário)
+   - Camada 4: Saúde financeira (score 0-100)
+
+5. **Backlog 1.4 (Renda variável):** FREELANCE-irregular é o caso real do Renato. Sugestão: ao invés de "renda variável" genérico, tratar como **HU-X.Y (Renda freelance com meses secos)** — template "esse mês caiu X, semana Y, dia Z" + auto-cálculo de "saldo mínimo necessário".
+
+6. **Backlog 1.5 (Histórico):** OK no final. Sugiro **HU-X.Z (Comparativo mês a mês)** como MUST — o que subiu, o que desceu, % de mudança por categoria.
+
+7. **Renda fixa hardcoded no JS (MVP):** mover pra **jsonbin** com campo `renato: { renda_mensal, dia_pagamento, tipo }` e `alice: { renda_mensal, dia_pagamento, tipo }`. Aí o agente financeiro consegue ler/atualizar.
+
+8. **Cal (.ics export) — IDÉIA FORA DO BACKLOG:** o Renato pediu **calendário das contas aparecendo** (.ics export). Adicionar à Release 1.2 ou criar Release 1.6 (Integrações externas). Pró: integra com Google Calendar, Apple Calendar, etc.
+
+9. **Visibilidade diferentes (esposa):** modelar como `perfis: { renato: "admin", alice: "viewer_renato" }` no jsonbin. Alice vê o que Renato vê, mas sem editar. Perfil "viewer_conjunta" pode ser release 1.7 (Família).
+
+### 🚀 Roadmap sugerido (acumulado)
+
+```
+MVP 1.0   ✅ FEITO    Dashboard + Cadastro + Alerta
+1.2       🔜 PRÓXIMA  PIN + Calendário .ics (sugestão)
+1.3       📅          Camadas de visualização (4 níveis)
+1.4       📅          Renda variável (freelance + meses secos)
+1.5       📅          Histórico + Comparativo mês a mês
+1.6       💡          Telegram Bot (notificações reais)
+1.7       💡          Perfis família (Alice)
+1.8       💡          Importar OFX/CSV
+```
+
+### 🤝 Acordo de colaboração Hermes ↔ Claude
+
+- Claude escreve código + atualiza PRD quando implementar
+- Hermes comenta PRD + atualiza `visao.html` + mantém `handoff-claude.md`
+- Renato arbitra discordâncias
+- Cada agente **assina** o que escreveu (data + nome)
+- Arquivos compartilhados: PRD, `visao.html`, `handoff-claude.md`
+- Arquivos separados: `index.html` (Claude), `financas_casa.html` (Claude), skill do agente financeiro (Hermes)
+
+> — Hermes, 15/06/2026 02:20 BRT (gol de placa do Renato sobre "vocês são colegas, não rivais")
+
+---
+
 ## Notas técnicas
 
 - Arquivo único HTML autocontido (sem framework, sem build)
