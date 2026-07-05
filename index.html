@@ -222,7 +222,7 @@ input:checked + .slider::before { transform:translateX(18px); background:#fff; }
 <div class="scroll-area">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
     <div class="chart-title">Projeção do saldo · Jun/2026 – Jun/2027 · <span id="chartPeriodLabel">53 semanas</span></div>
-    <button onclick="toggleChartMode()" style="background:#1a1a35;border:1px solid #2a2a5a;color:#777;border-radius:7px;padding:6px 12px;cursor:pointer;font-size:0.75rem;">📊 Compacto</button>
+    <button onclick="toggleCompactPopup()" style="background:#1a1a35;border:1px solid #2a2a5a;color:#777;border-radius:7px;padding:6px 12px;cursor:pointer;font-size:0.75rem;">📊 Compacto</button>
   </div>
   <div class="chart-outer">
     <div class="chart-months" id="chartMonths"></div>
@@ -235,6 +235,23 @@ input:checked + .slider::before { transform:translateX(18px); background:#fff; }
 </div>
 
 <div class="note" id="footNote"></div>
+
+<!-- MODAL POPUP COMPACTO (gráfico por mês) -->
+<div class="modal-overlay" id="compactModal">
+  <div class="modal" style="max-width:90vw;max-height:80vh;overflow-y:auto;width:95%;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 style="margin:0;font-size:0.9rem;">📊 Visão compacta · 53 semanas</h3>
+      <button onclick="toggleCompactPopup()" style="background:none;border:none;color:#777;cursor:pointer;font-size:1.2rem;">✕</button>
+    </div>
+    <div class="chart-outer">
+      <div class="chart-months" id="compactChartMonths"></div>
+      <div style="display:flex;">
+        <div class="chart-spacer"></div>
+        <div class="chart-bars" id="compactChart" style="gap:3px;"><div class="zero-line" style="position:absolute;left:0;right:0;border-top:1px dashed #3a3a5a;z-index:0;pointer-events:none;bottom:50%;"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL UNIFICADO (despesa ou ganho) -->
 <div class="modal-overlay" id="modalOverlay">
@@ -605,17 +622,55 @@ function computeData(){
   return {wd,pmt,loanAmt,loanRate,loanN,sb};
 }
 
-// ── CHART MODE ───────────────────────────────────────────────────────────────
-let chartCompactMode = false;
-
-function toggleChartMode(){
-  chartCompactMode = !chartCompactMode;
-  render();
+// ── COMPACT POPUP ────────────────────────────────────────────────────────────
+function toggleCompactPopup(){
+  const modal=document.getElementById('compactModal');
+  modal.classList.toggle('open');
+  if(modal.classList.contains('open')) renderCompactChart();
 }
 
 document.addEventListener('keydown', e => {
-  if(e.ctrlKey && e.code === 'KeyS'){ e.preventDefault(); toggleChartMode(); }
+  if(e.ctrlKey && e.code === 'KeyS'){ e.preventDefault(); toggleCompactPopup(); }
 });
+
+function renderCompactChart(){
+  const res=computeData(); const wd=res.wd;
+  const chart=document.getElementById('compactChart');
+  const monthsContainer=document.getElementById('compactChartMonths');
+
+  chart.innerHTML='<div class="zero-line" style="position:absolute;left:0;right:0;border-top:1px dashed #3a3a5a;z-index:0;pointer-events:none;bottom:50%;"></div>';
+  monthsContainer.innerHTML='';
+
+  // Renderiza barra de meses
+  const monthBar=document.createElement('div');
+  monthBar.style.cssText='display:flex;flex:1;margin-left:152px;';
+  let lastMonth=-1;
+  wd.forEach((w,i)=>{
+    const ws=WEEK_STARTS[i];
+    const currentMonth=ws.getMonth();
+    const wrap=document.createElement('div'); wrap.style.cssText='flex:1;border-right:1px solid #2a2a4a;padding:4px 0;text-align:center;font-size:0.65rem;color:#555;';
+    if(currentMonth!==lastMonth){ wrap.textContent=MESES[currentMonth]; lastMonth=currentMonth; }
+    monthBar.appendChild(wrap);
+  });
+  monthsContainer.appendChild(monthBar);
+
+  const maxPos=Math.max(...wd.map(w=>w.balance),1),maxNeg=Math.abs(Math.min(...wd.map(w=>w.balance),0));
+  const total=maxPos+maxNeg||1,zeroPct=(maxNeg/total)*100;
+  const zl=chart.querySelector('.zero-line');
+  zl.style.bottom=zeroPct+'%';
+  const ref=Math.max(maxPos,maxNeg)||1;
+
+  wd.forEach((w,i)=>{
+    const color=w.balance>2000?'#4CAF50':w.balance>=0?'#FFC107':'#f44336';
+    const wrap=document.createElement('div'); wrap.className='bar-wrap';
+    const pct=Math.max(2,(Math.abs(w.balance)/ref)*(w.balance>=0?(100-zeroPct):zeroPct));
+    const bot=w.balance>=0?zeroPct:zeroPct-pct;
+    const bar=document.createElement('div'); bar.className='bar';
+    bar.style.cssText=`height:${pct}%;bottom:${bot}%;background:${color};border-radius:${w.balance>=0?'3px 3px 0 0':'0 0 3px 3px'};`;
+    bar.setAttribute('data-tip',weeks[i].dates+': '+R(w.balance));
+    wrap.appendChild(bar); chart.appendChild(wrap);
+  });
+}
 
 // ── RENDER ───────────────────────────────────────────────────────────────────
 function onStateChange(){render();}
@@ -666,104 +721,38 @@ function renderSimResults({pmt,loanAmt,loanRate,loanN}){
 
 function renderChart(wd){
   const chart=document.getElementById('barChart'),zl=document.getElementById('zeroLine');
-  const spacer=document.getElementById('chartSpacer');
-  const label=document.getElementById('chartPeriodLabel');
   const monthsContainer=document.getElementById('chartMonths');
 
   chart.innerHTML=''; chart.appendChild(zl);
   monthsContainer.innerHTML='';
 
-  if(!chartCompactMode){
-    chart.classList.remove('compact');
-    spacer.style.display='block';
-    label.textContent='53 semanas';
+  // Renderiza barra de meses
+  const monthBar=document.createElement('div');
+  monthBar.style.cssText='display:flex;flex:1;margin-left:152px;';
+  let lastMonth=-1;
+  wd.forEach((w,i)=>{
+    const ws=WEEK_STARTS[i];
+    const currentMonth=ws.getMonth();
+    const wrap=document.createElement('div'); wrap.style.cssText='flex:1;border-right:1px solid #2a2a4a;padding:4px 0;text-align:center;font-size:0.65rem;color:#555;';
+    if(currentMonth!==lastMonth){ wrap.textContent=MESES[currentMonth]; lastMonth=currentMonth; }
+    monthBar.appendChild(wrap);
+  });
+  monthsContainer.appendChild(monthBar);
 
-    // Renderiza barra de meses
-    const monthBar=document.createElement('div');
-    monthBar.style.cssText='display:flex;flex:1;margin-left:152px;';
-    let lastMonth=-1;
-    wd.forEach((w,i)=>{
-      const ws=WEEK_STARTS[i];
-      const currentMonth=ws.getMonth();
-      const wrap=document.createElement('div'); wrap.style.cssText='flex:1;border-right:1px solid #2a2a4a;padding:4px 0;text-align:center;font-size:0.65rem;color:#555;';
-      if(currentMonth!==lastMonth){ wrap.textContent=MESES[currentMonth]; lastMonth=currentMonth; }
-      monthBar.appendChild(wrap);
-    });
-    monthsContainer.appendChild(monthBar);
-    const maxPos=Math.max(...wd.map(w=>w.balance),1),maxNeg=Math.abs(Math.min(...wd.map(w=>w.balance),0));
-    const total=maxPos+maxNeg||1,zeroPct=(maxNeg/total)*100;
-    zl.style.bottom=zeroPct+'%';
-    const ref=Math.max(maxPos,maxNeg)||1;
-    wd.forEach((w,i)=>{
-      const color=w.balance>2000?'#4CAF50':w.balance>=0?'#FFC107':'#f44336';
-      const wrap=document.createElement('div'); wrap.className='bar-wrap';
-      const pct=Math.max(2,(Math.abs(w.balance)/ref)*(w.balance>=0?(100-zeroPct):zeroPct));
-      const bot=w.balance>=0?zeroPct:zeroPct-pct;
-      const bar=document.createElement('div'); bar.className='bar';
-      bar.style.cssText=`height:${pct}%;bottom:${bot}%;background:${color};border-radius:${w.balance>=0?'3px 3px 0 0':'0 0 3px 3px'};`;
-      bar.setAttribute('data-tip',weeks[i].dates+': '+R(w.balance));
-      wrap.appendChild(bar); chart.appendChild(wrap);
-    });
-  } else {
-    chart.classList.add('compact');
-    spacer.style.display='none';
-    const numMonths=13;
-    const monthBars=Array.from({length:numMonths},()=>({income:0,expense:0,net:0,balance:0}));
-    wd.forEach((w,i)=>{
-      const mIdx=Math.floor(i*12/wd.length);
-      if(mIdx<numMonths){
-        const income=w.income+w.vrIncome+w.extraIncome+w.loanIncome;
-        monthBars[mIdx].income+=income;
-        monthBars[mIdx].expense+=w.totalOut;
-        monthBars[mIdx].net+=w.net;
-      }
-    });
-    let bal=sb;
-    monthBars.forEach(m=>{ bal+=m.net; m.balance=bal; });
-    label.textContent=`${numMonths} meses`;
-
-    // Renderiza barra de meses (compacto) - SÓ LABELS
-    const monthBar=document.createElement('div');
-    monthBar.style.cssText='display:flex;flex:1;';
-    const mesesCompacto=['Jun','Jul','Ago','Set','Out','Nov','Dez','Jan','Fev','Mar','Abr','Mai','Jun'];
-    mesesCompacto.forEach((m,i)=>{
-      const wrap=document.createElement('div'); wrap.style.cssText='flex:1;border-right:1px solid #2a2a4a;padding:4px 0;text-align:center;font-size:0.65rem;color:#555;';
-      wrap.textContent=m;
-      monthBar.appendChild(wrap);
-    });
-    monthsContainer.appendChild(monthBar);
-
-    // Diverging bars (ganhos acima verde, gastos abaixo vermelho)
-    const maxIncome=Math.max(...monthBars.map(m=>m.income),1);
-    const maxExpense=Math.max(...monthBars.map(m=>m.expense),1);
-    const ref=Math.max(maxIncome,maxExpense)||1;
-    const pctBase=50; // 50% pro topo (ganhos), 50% pro fundo (gastos)
-
-    monthBars.forEach((m,i)=>{
-      const wrap=document.createElement('div');
-      wrap.style.cssText='min-width:110px;flex:0 0 110px;height:100%;position:relative;z-index:1;';
-
-      // Ganhos (verde, pra cima)
-      const incomePct=(m.income/ref)*pctBase;
-      if(incomePct>0){
-        const incomeBar=document.createElement('div');
-        incomeBar.style.cssText=`position:absolute;bottom:50%;height:${incomePct}%;width:calc(100% - 6px);left:3px;background:#4CAF50;border-radius:3px 3px 0 0;`;
-        incomeBar.setAttribute('data-tip',`${mesesCompacto[i]}\nGanhos: ${R(m.income)}\nGastos: ${R(m.expense)}\nNet: ${R(m.net)}\nSaldo: ${R(m.balance)}`);
-        wrap.appendChild(incomeBar);
-      }
-
-      // Gastos (vermelho, pra baixo)
-      const expensePct=(m.expense/ref)*pctBase;
-      if(expensePct>0){
-        const expenseBar=document.createElement('div');
-        expenseBar.style.cssText=`position:absolute;bottom:calc(50% - ${expensePct}%);height:${expensePct}%;width:calc(100% - 6px);left:3px;background:#f44336;border-radius:0 0 3px 3px;`;
-        expenseBar.setAttribute('data-tip',`${mesesCompacto[i]}\nGanhos: ${R(m.income)}\nGastos: ${R(m.expense)}\nNet: ${R(m.net)}\nSaldo: ${R(m.balance)}`);
-        wrap.appendChild(expenseBar);
-      }
-
-      chart.appendChild(wrap);
-    });
-  }
+  const maxPos=Math.max(...wd.map(w=>w.balance),1),maxNeg=Math.abs(Math.min(...wd.map(w=>w.balance),0));
+  const total=maxPos+maxNeg||1,zeroPct=(maxNeg/total)*100;
+  zl.style.bottom=zeroPct+'%';
+  const ref=Math.max(maxPos,maxNeg)||1;
+  wd.forEach((w,i)=>{
+    const color=w.balance>2000?'#4CAF50':w.balance>=0?'#FFC107':'#f44336';
+    const wrap=document.createElement('div'); wrap.className='bar-wrap';
+    const pct=Math.max(2,(Math.abs(w.balance)/ref)*(w.balance>=0?(100-zeroPct):zeroPct));
+    const bot=w.balance>=0?zeroPct:zeroPct-pct;
+    const bar=document.createElement('div'); bar.className='bar';
+    bar.style.cssText=`height:${pct}%;bottom:${bot}%;background:${color};border-radius:${w.balance>=0?'3px 3px 0 0':'0 0 3px 3px'};`;
+    bar.setAttribute('data-tip',weeks[i].dates+': '+R(w.balance));
+    wrap.appendChild(bar); chart.appendChild(wrap);
+  });
 }
 
 function renderTable({wd,loanAmt}){
