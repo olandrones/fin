@@ -55,7 +55,11 @@ body { font-family: 'Segoe UI', sans-serif; background: #0f0f1a; color: #e0e0e0;
 
 .scroll-area { padding:0 32px 40px; }
 .chart-title { font-size:0.72rem; color:#555; text-transform:uppercase; letter-spacing:1px; padding:16px 0 8px; }
-.chart-outer { display:flex; }
+.chart-outer { display:flex; flex-direction:column; }
+.chart-months { display:flex; min-height:24px; }
+.chart-months.hidden { display:none; }
+.month-label { flex:1; text-align:center; font-size:0.65rem; color:#555; padding-top:4px; border-right:1px solid #2a2a4a; }
+.month-label:last-child { border-right:none; }
 .chart-spacer { min-width:152px; flex:0 0 152px; }
 .chart-bars { display:flex; align-items:flex-end; gap:3px; height:280px; position:relative; }
 .chart-bars.compact { height:180px; gap:1px; }
@@ -221,8 +225,11 @@ input:checked + .slider::before { transform:translateX(18px); background:#fff; }
     <button onclick="toggleChartMode()" style="background:#1a1a35;border:1px solid #2a2a5a;color:#777;border-radius:7px;padding:6px 12px;cursor:pointer;font-size:0.75rem;">📊 Compacto</button>
   </div>
   <div class="chart-outer">
-    <div class="chart-spacer" id="chartSpacer"></div>
-    <div class="chart-bars" id="barChart"><div class="zero-line" id="zeroLine"></div></div>
+    <div class="chart-months" id="chartMonths"></div>
+    <div style="display:flex;">
+      <div class="chart-spacer" id="chartSpacer"></div>
+      <div class="chart-bars" id="barChart"><div class="zero-line" id="zeroLine"></div></div>
+    </div>
   </div>
   <table id="mainTable"></table>
 </div>
@@ -647,13 +654,28 @@ function renderChart(wd){
   const chart=document.getElementById('barChart'),zl=document.getElementById('zeroLine');
   const spacer=document.getElementById('chartSpacer');
   const label=document.getElementById('chartPeriodLabel');
+  const monthsContainer=document.getElementById('chartMonths');
 
   chart.innerHTML=''; chart.appendChild(zl);
+  monthsContainer.innerHTML='';
 
   if(!chartCompactMode){
     chart.classList.remove('compact');
     spacer.style.display='block';
     label.textContent='53 semanas';
+
+    // Renderiza barra de meses
+    const monthBar=document.createElement('div');
+    monthBar.style.cssText='display:flex;flex:1;margin-left:152px;';
+    let lastMonth=-1;
+    wd.forEach((w,i)=>{
+      const ws=WEEK_STARTS[i];
+      const currentMonth=ws.getMonth();
+      const wrap=document.createElement('div'); wrap.style.cssText='flex:1;border-right:1px solid #2a2a4a;padding:4px 0;text-align:center;font-size:0.65rem;color:#555;';
+      if(currentMonth!==lastMonth){ wrap.textContent=MESES[currentMonth]; lastMonth=currentMonth; }
+      monthBar.appendChild(wrap);
+    });
+    monthsContainer.appendChild(monthBar);
     const maxPos=Math.max(...wd.map(w=>w.balance),1),maxNeg=Math.abs(Math.min(...wd.map(w=>w.balance),0));
     const total=maxPos+maxNeg||1,zeroPct=(maxNeg/total)*100;
     zl.style.bottom=zeroPct+'%';
@@ -680,6 +702,17 @@ function renderChart(wd){
     let bal=wd[0].balance-(wd.slice(0,Math.max(1,Math.floor(wd.length/12))).reduce((s,w)=>s+w.net,0));
     monthBars.forEach(m=>{ bal+=m.net; m.balance=bal; });
     label.textContent=`${numMonths} meses`;
+
+    // Renderiza barra de meses (compacto)
+    const monthBar=document.createElement('div');
+    monthBar.style.cssText='display:flex;flex:1;';
+    const mesesCompacto=['Jun','Jul','Ago','Set','Out','Nov','Dez','Jan','Fev','Mar','Abr','Mai','Jun'];
+    mesesCompacto.forEach((m,i)=>{
+      const wrap=document.createElement('div'); wrap.style.cssText='flex:1;border-right:1px solid #2a2a4a;padding:4px 0;text-align:center;font-size:0.65rem;color:#555;';
+      wrap.textContent=m;
+      monthBar.appendChild(wrap);
+    });
+    monthsContainer.appendChild(monthBar);
 
     const maxPos=Math.max(...monthBars.map(m=>m.balance),1),maxNeg=Math.abs(Math.min(...monthBars.map(m=>m.balance),0));
     const total=maxPos+maxNeg||1,zeroPct=(maxNeg/total)*100;
