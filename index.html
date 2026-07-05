@@ -57,7 +57,8 @@ body { font-family: 'Segoe UI', sans-serif; background: #0f0f1a; color: #e0e0e0;
 .chart-title { font-size:0.72rem; color:#555; text-transform:uppercase; letter-spacing:1px; padding:16px 0 8px; }
 .chart-outer { display:flex; }
 .chart-spacer { min-width:152px; flex:0 0 152px; }
-.chart-bars { display:flex; align-items:flex-end; gap:3px; height:110px; position:relative; }
+.chart-bars { display:flex; align-items:flex-end; gap:3px; height:280px; position:relative; }
+.chart-bars.compact { height:180px; gap:1px; }
 .zero-line { position:absolute; left:0; right:0; border-top:1px dashed #3a3a5a; z-index:0; pointer-events:none; }
 .bar-wrap { min-width:110px; flex:0 0 110px; height:100%; position:relative; z-index:1; }
 .bar { position:absolute; width:calc(100% - 6px); left:3px; min-height:3px; cursor:default; }
@@ -147,29 +148,9 @@ input:checked + .slider::before { transform:translateX(18px); background:#fff; }
 
 .note { padding:12px 32px 24px; font-size:0.72rem; color:#3a3a5a; line-height:1.8; border-top:1px solid #1a1a2e; }
 
-/* PIN LOCK */
-#pinLock { position:fixed; inset:0; background:#0a0a14; z-index:9999; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; }
-#pinLock h2 { color:#e0e0e0; font-size:1.1rem; font-weight:400; letter-spacing:2px; text-transform:uppercase; }
-#pinDots { display:flex; gap:14px; }
-.pin-dot { width:16px; height:16px; border-radius:50%; background:#2a2a4a; border:2px solid #3a3a6a; transition:background .15s; }
-.pin-dot.filled { background:#4a90e2; border-color:#4a90e2; }
-#pinError { color:#f44336; font-size:0.8rem; opacity:0; transition:opacity .3s; height:18px; }
-#pinLock.shake { animation:shake .35s; }
-@keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)} }
 </style>
 </head>
 <body>
-
-<div id="pinLock">
-  <h2>Digite o PIN</h2>
-  <div id="pinDots">
-    <div class="pin-dot" id="dot0"></div>
-    <div class="pin-dot" id="dot1"></div>
-    <div class="pin-dot" id="dot2"></div>
-    <div class="pin-dot" id="dot3"></div>
-  </div>
-  <div id="pinError">PIN incorreto</div>
-</div>
 
 <div class="save-badge" id="saveBadge">✓ salvo</div>
 
@@ -235,9 +216,12 @@ input:checked + .slider::before { transform:translateX(18px); background:#fff; }
 </div>
 
 <div class="scroll-area">
-  <div class="chart-title">Projeção do saldo · Jun/2026 – Jun/2027 · 53 semanas</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div class="chart-title">Projeção do saldo · Jun/2026 – Jun/2027 · <span id="chartPeriodLabel">53 semanas</span></div>
+    <button onclick="toggleChartMode()" style="background:#1a1a35;border:1px solid #2a2a5a;color:#777;border-radius:7px;padding:6px 12px;cursor:pointer;font-size:0.75rem;">📊 Compacto</button>
+  </div>
   <div class="chart-outer">
-    <div class="chart-spacer"></div>
+    <div class="chart-spacer" id="chartSpacer"></div>
     <div class="chart-bars" id="barChart"><div class="zero-line" id="zeroLine"></div></div>
   </div>
   <table id="mainTable"></table>
@@ -600,6 +584,18 @@ function computeData(){
   return {wd,pmt,loanAmt,loanRate,loanN,sb};
 }
 
+// ── CHART MODE ───────────────────────────────────────────────────────────────
+let chartCompactMode = false;
+
+function toggleChartMode(){
+  chartCompactMode = !chartCompactMode;
+  render();
+}
+
+document.addEventListener('keydown', e => {
+  if(e.ctrlKey && e.code === 'KeyS'){ e.preventDefault(); toggleChartMode(); }
+});
+
 // ── RENDER ───────────────────────────────────────────────────────────────────
 function onStateChange(){render();}
 
@@ -649,26 +645,72 @@ function renderSimResults({pmt,loanAmt,loanRate,loanN}){
 
 function renderChart(wd){
   const chart=document.getElementById('barChart'),zl=document.getElementById('zeroLine');
+  const spacer=document.getElementById('chartSpacer');
+  const label=document.getElementById('chartPeriodLabel');
+
   chart.innerHTML=''; chart.appendChild(zl);
-  const maxPos=Math.max(...wd.map(w=>w.balance),1),maxNeg=Math.abs(Math.min(...wd.map(w=>w.balance),0));
-  const total=maxPos+maxNeg||1,zeroPct=(maxNeg/total)*100;
-  zl.style.bottom=zeroPct+'%';
-  const ref=Math.max(maxPos,maxNeg)||1;
-  wd.forEach((w,i)=>{
-    const color=w.balance>2000?'#4CAF50':w.balance>=0?'#FFC107':'#f44336';
-    const wrap=document.createElement('div'); wrap.className='bar-wrap';
-    const pct=Math.max(2,(Math.abs(w.balance)/ref)*(w.balance>=0?(100-zeroPct):zeroPct));
-    const bot=w.balance>=0?zeroPct:zeroPct-pct;
-    const bar=document.createElement('div'); bar.className='bar';
-    bar.style.cssText=`height:${pct}%;bottom:${bot}%;background:${color};border-radius:${w.balance>=0?'3px 3px 0 0':'0 0 3px 3px'};`;
-    bar.setAttribute('data-tip',weeks[i].dates+': '+R(w.balance));
-    wrap.appendChild(bar); chart.appendChild(wrap);
-  });
+
+  if(!chartCompactMode){
+    chart.classList.remove('compact');
+    spacer.style.display='block';
+    label.textContent='53 semanas';
+    const maxPos=Math.max(...wd.map(w=>w.balance),1),maxNeg=Math.abs(Math.min(...wd.map(w=>w.balance),0));
+    const total=maxPos+maxNeg||1,zeroPct=(maxNeg/total)*100;
+    zl.style.bottom=zeroPct+'%';
+    const ref=Math.max(maxPos,maxNeg)||1;
+    wd.forEach((w,i)=>{
+      const color=w.balance>2000?'#4CAF50':w.balance>=0?'#FFC107':'#f44336';
+      const wrap=document.createElement('div'); wrap.className='bar-wrap';
+      const pct=Math.max(2,(Math.abs(w.balance)/ref)*(w.balance>=0?(100-zeroPct):zeroPct));
+      const bot=w.balance>=0?zeroPct:zeroPct-pct;
+      const bar=document.createElement('div'); bar.className='bar';
+      bar.style.cssText=`height:${pct}%;bottom:${bot}%;background:${color};border-radius:${w.balance>=0?'3px 3px 0 0':'0 0 3px 3px'};`;
+      bar.setAttribute('data-tip',weeks[i].dates+': '+R(w.balance));
+      wrap.appendChild(bar); chart.appendChild(wrap);
+    });
+  } else {
+    chart.classList.add('compact');
+    spacer.style.display='none';
+    const numMonths=13;
+    const monthBars=Array.from({length:numMonths},()=>({net:0,balance:0}));
+    wd.forEach((w,i)=>{
+      const mIdx=Math.floor(i*12/wd.length);
+      if(mIdx<numMonths) monthBars[mIdx].net+=w.net;
+    });
+    let bal=wd[0].balance-(wd.slice(0,Math.max(1,Math.floor(wd.length/12))).reduce((s,w)=>s+w.net,0));
+    monthBars.forEach(m=>{ bal+=m.net; m.balance=bal; });
+    label.textContent=`${numMonths} meses`;
+
+    const maxPos=Math.max(...monthBars.map(m=>m.balance),1),maxNeg=Math.abs(Math.min(...monthBars.map(m=>m.balance),0));
+    const total=maxPos+maxNeg||1,zeroPct=(maxNeg/total)*100;
+    zl.style.bottom=zeroPct+'%';
+    const ref=Math.max(maxPos,maxNeg)||1;
+    const meses=['Jun','Jul','Ago','Set','Out','Nov','Dez','Jan','Fev','Mar','Abr','Mai','Jun'];
+    monthBars.forEach((m,i)=>{
+      const color=m.balance>2000?'#4CAF50':m.balance>=0?'#FFC107':'#f44336';
+      const wrap=document.createElement('div'); wrap.className='bar-wrap';
+      const pct=Math.max(2,(Math.abs(m.balance)/ref)*(m.balance>=0?(100-zeroPct):zeroPct));
+      const bot=m.balance>=0?zeroPct:zeroPct-pct;
+      const bar=document.createElement('div'); bar.className='bar';
+      bar.style.cssText=`height:${pct}%;bottom:${bot}%;background:${color};border-radius:${m.balance>=0?'3px 3px 0 0':'0 0 3px 3px'};`;
+      bar.setAttribute('data-tip',meses[i]+': '+R(m.balance));
+      wrap.appendChild(bar); chart.appendChild(wrap);
+    });
+  }
 }
 
 function renderTable({wd,loanAmt}){
   const table=document.getElementById('mainTable'); table.innerHTML='';
   const N=weeks.length;
+  const today=new Date(); today.setHours(0,0,0,0);
+  let startWeekIdx=0;
+  for(let i=0;i<N;i++){
+    const ws=new Date(WEEK_STARTS[i]); ws.setHours(0,0,0,0);
+    if(ws>=today){ startWeekIdx=i; break; }
+  }
+  const displayWeeks=weeks.slice(startWeekIdx);
+  const displayWd=wd.slice(startWeekIdx);
+
   function mkRow(cells){
     const tr=document.createElement('tr');
     cells.forEach(c=>{
@@ -696,36 +738,36 @@ function renderTable({wd,loanAmt}){
   }
 
   // Header
-  table.appendChild(mkRow([{th:true,cls:'row-head',text:''},...weeks.map(w=>({th:true,cls:'week'+(w.now?' now':''),html:`${w.label}<small>${w.dates}</small>`}))]));
+  table.appendChild(mkRow([{th:true,cls:'row-head',text:''},...displayWeeks.map(w=>({th:true,cls:'week'+(w.now?' now':''),html:`${w.label}<small>${w.dates}</small>`}))]));
 
   // Salários
-  table.appendChild(mkRow([{cls:'row-label',text:'💰 Salários'},...wd.map(w=>w.income>0?{cls:'income-cell',text:'R$ '+BR(w.income)}:{cls:'empty-cell',text:'—'})]));
+  table.appendChild(mkRow([{cls:'row-label',text:'💰 Salários'},...displayWd.map(w=>w.income>0?{cls:'income-cell',text:'R$ '+BR(w.income)}:{cls:'empty-cell',text:'—'})]));
   // VR
-  table.appendChild(mkRow([{cls:'row-label',text:'🍽️ VR Alimentação'},...wd.map(w=>w.vrIncome>0?{cls:'vr-cell',text:'R$ '+BR(w.vrIncome)}:{cls:'empty-cell',text:'—'})]));
+  table.appendChild(mkRow([{cls:'row-label',text:'🍽️ VR Alimentação'},...displayWd.map(w=>w.vrIncome>0?{cls:'vr-cell',text:'R$ '+BR(w.vrIncome)}:{cls:'empty-cell',text:'—'})]));
   // Ganhos extras
-  if(wd.some(w=>w.extraIncome>0))
-    table.appendChild(mkRow([{cls:'row-label',text:'✨ Ganhos extras'},...wd.map(w=>w.extraIncome>0?{cls:'extra-inc',text:'+R$ '+BR(w.extraIncome)}:{cls:'empty-cell',text:'—'})]));
+  if(displayWd.some(w=>w.extraIncome>0))
+    table.appendChild(mkRow([{cls:'row-label',text:'✨ Ganhos extras'},...displayWd.map(w=>w.extraIncome>0?{cls:'extra-inc',text:'+R$ '+BR(w.extraIncome)}:{cls:'empty-cell',text:'—'})]));
   // Empréstimo
   if(loanAmt>0)
-    table.appendChild(mkRow([{cls:'row-label',text:'💳 Empréstimo entra'},...wd.map(w=>w.loanIncome>0?{cls:'loan-cell',text:'+R$ '+BR(w.loanIncome)}:{cls:'empty-cell',text:'—'})]));
+    table.appendChild(mkRow([{cls:'row-label',text:'💳 Empréstimo entra'},...displayWd.map(w=>w.loanIncome>0?{cls:'loan-cell',text:'+R$ '+BR(w.loanIncome)}:{cls:'empty-cell',text:'—'})]));
   // Saídas
-  table.appendChild(mkRow([{cls:'row-label',text:'💸 Saídas totais'},...wd.map(w=>w.totalOut>0?{cls:'expense-cell',text:'–R$ '+BR(w.totalOut)}:{cls:'empty-cell',text:'—'})]));
+  table.appendChild(mkRow([{cls:'row-label',text:'💸 Saídas totais'},...displayWd.map(w=>w.totalOut>0?{cls:'expense-cell',text:'–R$ '+BR(w.totalOut)}:{cls:'empty-cell',text:'—'})]));
   // Juros especial (linha resumo, só aparece se houver cobrança)
-  if(wd.some(w=>w.items.some(it=>it.isInterest)))
-    table.appendChild(mkRow([{cls:'row-label',html:'📊 Juros especial<br><span style="font-size:0.65rem;color:#7a5a30;">dia 4 · taxa '+((state.overdraftRate||8).toFixed(1))+'% a.m.</span>'},...wd.map(w=>{const t=w.items.filter(it=>it.isInterest).reduce((s,it)=>s+it.v,0);return t>0?{cls:'interest-cell',text:'–R$ '+BR(t)}:{cls:'empty-cell',text:'—'};})]));
+  if(displayWd.some(w=>w.items.some(it=>it.isInterest)))
+    table.appendChild(mkRow([{cls:'row-label',html:'📊 Juros especial<br><span style="font-size:0.65rem;color:#7a5a30;">dia 4 · taxa '+((state.overdraftRate||8).toFixed(1))+'% a.m.</span>'},...displayWd.map(w=>{const t=w.items.filter(it=>it.isInterest).reduce((s,it)=>s+it.v,0);return t>0?{cls:'interest-cell',text:'–R$ '+BR(t)}:{cls:'empty-cell',text:'—'};})]));
   // Net
-  table.appendChild(mkRow([{cls:'row-label',text:'= Semana'},...wd.map(w=>w.net!==0?{cls:w.net>=0?'net-pos':'net-neg',text:(w.net>=0?'+R$ ':'–R$ ')+BR(w.net)}:{cls:'empty-cell',text:'—'})]));
+  table.appendChild(mkRow([{cls:'row-label',text:'= Semana'},...displayWd.map(w=>w.net!==0?{cls:w.net>=0?'net-pos':'net-neg',text:(w.net>=0?'+R$ ':'–R$ ')+BR(w.net)}:{cls:'empty-cell',text:'—'})]));
 
   table.appendChild(spacer());
 
   // Saldo
-  table.appendChild(mkRow([{cls:'row-label',text:'🏦 Saldo acumulado'},...wd.map(w=>({cls:w.balance>2000?'bal-pos':w.balance>=0?'bal-mid':'bal-neg',text:R(w.balance)}))]));
+  table.appendChild(mkRow([{cls:'row-label',text:'🏦 Saldo acumulado'},...displayWd.map(w=>({cls:w.balance>2000?'bal-pos':w.balance>=0?'bal-mid':'bal-neg',text:R(w.balance)}))]));
 
   // Margem no cheque especial
   const odLimit = state.overdraftLimit || 11700;
   table.appendChild(mkRow([
     {cls:'row-label', html:'🚨 Margem no especial<br><span style="font-size:0.65rem;color:#5a4a30;">limite: R$ '+BR(odLimit)+'</span>'},
-    ...wd.map(w => {
+    ...displayWd.map(w => {
       const bal = w.balance;
       if(bal >= 0) return {cls:'mg-out', text:'✓ fora'};
       const used = Math.abs(bal);
@@ -742,7 +784,7 @@ function renderTable({wd,loanAmt}){
   // Detalhamento despesas
   table.appendChild(sectionLbl('Detalhamento das saídas'));
   const seenE=new Set(),allExp=[];
-  wd.forEach(w=>w.items.forEach(it=>{ if(!seenE.has(it.n)){seenE.add(it.n);allExp.push(it.n);} }));
+  displayWd.forEach(w=>w.items.forEach(it=>{ if(!seenE.has(it.n)){seenE.add(it.n);allExp.push(it.n);} }));
   allExp.forEach(name=>{
     const isLoan=name.startsWith('Parcela Itaú');
     const isInt =name.startsWith('Juros especial');
@@ -751,7 +793,7 @@ function renderTable({wd,loanAmt}){
     let lbl=name;
     if(exp) lbl+=` ${badge(exp)} <span class="row-actions"><button class="btn-ed" onclick="openModal('exp',${expIdx})" title="Editar">✏️</button><button class="btn-rm" onclick="removeEntry('exp',${expIdx})" title="Remover">✕</button></span>`;
     const cellCls = isInt?'sub-int':isLoan?'sub-loan':'sub-exp';
-    table.appendChild(mkRow([{cls:'row-label sub',html:lbl},...wd.map(w=>{ const it=w.items.find(i=>i.n===name); return it?{cls:cellCls,text:'R$ '+BR(it.v)}:{cls:'sub-empty',text:'·'}; })]));
+    table.appendChild(mkRow([{cls:'row-label sub',html:lbl},...displayWd.map(w=>{ const it=w.items.find(i=>i.n===name); return it?{cls:cellCls,text:'R$ '+BR(it.v)}:{cls:'sub-empty',text:'·'}; })]));
   });
 
   // Detalhamento ganhos
@@ -760,7 +802,7 @@ function renderTable({wd,loanAmt}){
     table.appendChild(sectionLbl('Detalhamento dos ganhos extras'));
     state.extraIncomes.forEach((inc,idx)=>{
       const lbl=`${inc.name} ${badge(inc)} <span class="row-actions"><button class="btn-ed" onclick="openModal('inc',${idx})" title="Editar">✏️</button><button class="btn-rm" onclick="removeEntry('inc',${idx})" title="Remover">✕</button></span>`;
-      table.appendChild(mkRow([{cls:'row-label sub',html:lbl},...wd.map(w=>{ const it=w.incItems.find(i=>i.n===inc.name); return it?{cls:'sub-inc',text:'+R$ '+BR(it.v)}:{cls:'sub-empty',text:'·'}; })]));
+      table.appendChild(mkRow([{cls:'row-label sub',html:lbl},...displayWd.map(w=>{ const it=w.incItems.find(i=>i.n===inc.name); return it?{cls:'sub-inc',text:'+R$ '+BR(it.v)}:{cls:'sub-empty',text:'·'}; })]));
     });
   }
 }
@@ -874,58 +916,10 @@ function toggleSim(){
   b.style.display=b.style.display==='none'?'':'none';
 }
 
-// ── PIN LOCK ─────────────────────────────────────────────────────────────────
-const PIN_CORRECT = '2305';
-let pinBuffer = '';
-let pinUnlocked = false;
-let pinResolve = null;
-
-function pinWaitForUnlock(){
-  return new Promise(r => { pinResolve = r; });
-}
-function pinUpdateDots(){
-  for(let i=0;i<4;i++){
-    document.getElementById('dot'+i).classList.toggle('filled', i < pinBuffer.length);
-  }
-}
-function pinHandleKey(e){
-  if(pinUnlocked) return;
-  if(e.key>='0' && e.key<='9' && pinBuffer.length<4){
-    pinBuffer += e.key;
-    pinUpdateDots();
-    if(pinBuffer.length===4){
-      if(pinBuffer===PIN_CORRECT){
-        pinUnlocked=true;
-        document.removeEventListener('keydown',pinHandleKey);
-        const lock=document.getElementById('pinLock');
-        lock.style.transition='opacity .3s';
-        lock.style.opacity='0';
-        setTimeout(()=>{ lock.style.display='none'; if(pinResolve) pinResolve(); },300);
-      } else {
-        const lock=document.getElementById('pinLock');
-        const err=document.getElementById('pinError');
-        err.style.opacity='1';
-        lock.classList.add('shake');
-        setTimeout(()=>{
-          lock.classList.remove('shake');
-          pinBuffer='';
-          pinUpdateDots();
-          setTimeout(()=>{ err.style.opacity='0'; },600);
-        },350);
-      }
-    }
-  } else if(e.key==='Backspace'){
-    pinBuffer=pinBuffer.slice(0,-1);
-    pinUpdateDots();
-    document.getElementById('pinError').style.opacity='0';
-  }
-}
-document.addEventListener('keydown',pinHandleKey);
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
 (async()=>{
-  await pinWaitForUnlock(); // aguarda PIN antes de qualquer coisa
-  await loadState();        // só carrega JSONBin após PIN verificado
+  await loadState();
   document.getElementById('startBalance').value    =state.startBalance;
   document.getElementById('overdraftLimit').value  =state.overdraftLimit;
   document.getElementById('overdraftRate').value   =state.overdraftRate;
