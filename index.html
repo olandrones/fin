@@ -595,9 +595,12 @@ function computeData(){
     wd[wi].totalOut += monthInt;
     wd[wi].net      -= monthInt;
   });
-  // Recalcula saldo com os juros incluídos
+  // Recalcula saldo com os juros incluídos (respeitando o ponto de partida "hoje")
   let bal2 = sb;
-  wd.forEach(w => { bal2 += w.net; w.balance = bal2; });
+  wd.forEach((w,i) => {
+    if(i>todayWeekIdx) bal2 += w.net;
+    w.balance = bal2;
+  });
 
   return {wd,pmt,loanAmt,loanRate,loanN,sb};
 }
