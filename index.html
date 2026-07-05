@@ -532,7 +532,7 @@ function computeData(){
     const w1=getWeekIdx(y,m,5);  if(w1>=0) wd[w1].income+=4541;
     const w2=getWeekIdx(y,m,15); if(w2>=0) wd[w2].income+=5490;
     const w3=getWeekIdx(y,m,30); if(w3>=0) wd[w3].income+=4047;
-    const wv=getWeekIdx(y,m,30); if(wv>=0) wd[wv].vrIncome+=650;
+    const wv=getWeekIdx(y,m,30); if(wv>=0) wd[wv].vrIncome+=1221;
     // Parcelas empréstimo
     if(loanAmt>0&&loanInstNum<loanN){
       const wl=getWeekIdx(y,m,10);
@@ -870,7 +870,7 @@ function renderNote({sb,loanAmt,loanRate,loanN,pmt}){
   if(loanAmt>0) extra=`<br>💳 Empréstimo ativo: ${R(loanAmt)} a ${loanRate}% a.m. em ${loanN}x de ${R(pmt)}.`;
   const odR = state.overdraftRate||8;
   document.getElementById('footNote').innerHTML=
-    `* Saldo inicial: <strong>${R(sb)}</strong> · Sal1 R$4.541 (dia 5) · Sal2 R$5.490 (dia 15) · Sal3 R$4.047 (dia 30) · VR R$650 (dia 30).<br>
+    `* Saldo inicial: <strong>${R(sb)}</strong> · Sal1 R$4.541 (dia 5) · Sal2 R$5.490 (dia 15) · Sal3 R$4.047 (dia 30) · VR R$1.221 (dia 30).<br>
      * Projeção de 53 semanas: Jun/2026 a Jun/2027.${extra}<br>
      * Juros do cheque especial Itaú: ${odR}% a.m. (aprox. ${(odR/30).toFixed(4)}%/dia), cobrados no dia 4 de cada mês sobre o saldo negativo acumulado no mês anterior.<br>
      * Dados salvos automaticamente no navegador.`;
