@@ -97,6 +97,8 @@ td.mg-out  { background:transparent; color:#3a3a5a; font-size:0.78rem; text-alig
 td.interest-cell { color:#FF9800; background:rgba(255,152,0,0.12); font-weight:700; }
 td.sub-int       { color:#c87820; background:rgba(255,152,0,0.07); font-size:0.76rem; }
 td.sub-exp  { color:#b55; background:rgba(180,60,60,0.07); font-size:0.76rem; }
+td.sub-exp-paid { color:#6a8; background:rgba(100,140,100,0.07); font-size:0.76rem; }
+tr.paid-row { opacity:0.6; }
 td.sub-inc  { color:#5a9a5a; background:rgba(60,120,60,0.07); font-size:0.76rem; }
 td.sub-loan { color:#7a7aff; background:rgba(100,100,255,0.07); font-size:0.76rem; }
 td.sub-empty{ background:transparent; color:#252535; text-align:center; font-size:0.72rem; }
@@ -629,6 +631,16 @@ function toggleCompactPopup(){
   if(modal.classList.contains('open')) renderCompactChart();
 }
 
+function togglePaid(expIdx){
+  const exp=state.expenses[expIdx];
+  if(!exp) return;
+  if(exp.paid===undefined) exp.paid=0;
+  const occurrences=getOccurrenceWeeks(exp.startDate,exp.recurring,exp.intervalDays,exp.endDate);
+  const totalInstallments=occurrences.length;
+  exp.paid=(exp.paid+1)%(totalInstallments+1);
+  onStateChange();
+}
+
 document.addEventListener('keydown', e => {
   if(e.ctrlKey && e.code === 'KeyS'){ e.preventDefault(); toggleCompactPopup(); }
 });
@@ -860,10 +872,30 @@ function renderTable({wd,loanAmt}){
     const isInt =name.startsWith('Juros especial');
     const expIdx=state.expenses.findIndex(e=>e.name===name);
     const exp=expIdx>=0?state.expenses[expIdx]:null;
+
+    // Inicializa paid se não existir
+    if(exp && exp.paid===undefined) exp.paid=0;
+
+    // Calcula total de parcelas
+    let totalInstallments=1;
+    if(exp){
+      const occurrences=getOccurrenceWeeks(exp.startDate,exp.recurring,exp.intervalDays,exp.endDate);
+      totalInstallments=occurrences.length;
+    }
+
     let lbl=name;
-    if(exp) lbl+=` ${badge(exp)} <span class="row-actions"><button class="btn-ed" onclick="openModal('exp',${expIdx})" title="Editar">✏️</button><button class="btn-rm" onclick="removeEntry('exp',${expIdx})" title="Remover">✕</button></span>`;
-    const cellCls = isInt?'sub-int':isLoan?'sub-loan':'sub-exp';
-    table.appendChild(mkRow([{cls:'row-label sub',html:lbl},...displayWd.map(w=>{ const it=w.items.find(i=>i.n===name); return it?{cls:cellCls,text:'R$ '+BR(it.v)}:{cls:'sub-empty',text:'·'}; })]));
+    if(exp){
+      const paidStatus=exp.paid>=totalInstallments?'✓ pago':''+exp.paid+'/'+totalInstallments;
+      lbl+=` ${badge(exp)} <span style="color:#888;font-size:0.8rem;margin:0 4px;">${paidStatus}</span> <span class="row-actions"><button class="btn-ed" onclick="openModal('exp',${expIdx})" title="Editar">✏️</button><button class="btn-rm" onclick="removeEntry('exp',${expIdx})" title="Remover">✕</button></span>`;
+      const cellCls = isInt?'sub-int':isLoan?'sub-loan':(exp.paid>=totalInstallments?'sub-exp-paid':'sub-exp');
+      const rowLblCls='row-label sub'+(exp.paid>=totalInstallments?' paid-row':'');
+      const row=mkRow([{cls:rowLblCls,html:lbl},...displayWd.map(w=>{ const it=w.items.find(i=>i.n===name); return it?{cls:cellCls,text:'R$ '+BR(it.v)}:{cls:'sub-empty',text:'·'}; })]);
+      row.style.cursor='pointer';
+      row.onclick=()=>togglePaid(expIdx);
+      table.appendChild(row);
+    } else {
+      table.appendChild(mkRow([{cls:'row-label sub',html:lbl},...displayWd.map(w=>{ const it=w.items.find(i=>i.n===name); return it?{cls:'sub-exp',text:'R$ '+BR(it.v)}:{cls:'sub-empty',text:'·'}; })]));
+    }
   });
 
   // Detalhamento ganhos
