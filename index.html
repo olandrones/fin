@@ -249,7 +249,7 @@ input:checked + .slider::before { transform:translateX(18px); background:#fff; }
       <label class="lbl-sw" for="mRecurring">Recorrente</label>
     </div>
 
-    <div class="interval-panel" id="intervalPanel">
+    <div class="interval-panel" id="intervalPanel" style="margin-bottom:0;">
       <div class="interval-label">Repetir a cada quantos dias?</div>
       <div class="interval-presets">
         <button class="preset-btn" onclick="setPreset(7)">7 · semanal</button>
@@ -265,6 +265,8 @@ input:checked + .slider::before { transform:translateX(18px); background:#fff; }
       </div>
       <div class="interval-hint" id="intervalHint"></div>
     </div>
+
+    <div class="modal-field" id="endDateField" style="display:none;"><label id="labelEndDate">Data de término (opcional)</label><input type="date" id="mEndDate"></div>
 
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
@@ -313,18 +315,19 @@ function dateToWeekIdx(dateStr) {
   return getWeekIdx(d.getFullYear(),d.getMonth(),d.getDate());
 }
 // Gera todas as semanas em que uma entrada ocorre
-function getOccurrenceWeeks(startDate, recurring, intervalDays) {
+function getOccurrenceWeeks(startDate, recurring, intervalDays, endDate) {
   const result=[];
   const d=new Date(startDate+'T12:00:00');
+  const end=endDate?new Date(endDate+'T12:00:00'):LAST_DATE;
   if(!recurring) {
     const wi=getWeekIdx(d.getFullYear(),d.getMonth(),d.getDate());
-    if(wi>=0) result.push(wi);
+    if(wi>=0&&d<=end) result.push(wi);
     return result;
   }
   const iv=Math.max(1,parseInt(intervalDays)||30);
   let cur=new Date(d);
   const seen=new Set();
-  while(cur<=LAST_DATE) {
+  while(cur<=end&&cur<=LAST_DATE) {
     const wi=getWeekIdx(cur.getFullYear(),cur.getMonth(),cur.getDate());
     if(wi>=0&&!seen.has(wi)){ seen.add(wi); result.push(wi); }
     cur.setDate(cur.getDate()+iv);
@@ -537,16 +540,16 @@ function computeData(){
   });
   if(loanAmt>0) wd[0].loanIncome=loanAmt;
 
-  // Despesas dinâmicas (startDate + intervalDays)
+  // Despesas dinâmicas (startDate + intervalDays + endDate)
   state.expenses.forEach(exp=>{
-    getOccurrenceWeeks(exp.startDate,exp.recurring,exp.intervalDays).forEach(wi=>{
+    getOccurrenceWeeks(exp.startDate,exp.recurring,exp.intervalDays,exp.endDate).forEach(wi=>{
       wd[wi].items.push({n:exp.name,v:exp.value});
     });
   });
 
   // Ganhos extras
   state.extraIncomes.forEach(inc=>{
-    getOccurrenceWeeks(inc.startDate,inc.recurring,inc.intervalDays).forEach(wi=>{
+    getOccurrenceWeeks(inc.startDate,inc.recurring,inc.intervalDays,inc.endDate).forEach(wi=>{
       wd[wi].incItems.push({n:inc.name,v:inc.value});
       wd[wi].extraIncome+=inc.value;
     });
@@ -767,7 +770,13 @@ function renderTable({wd,loanAmt}){
     if(!entry.recurring) return '<span class="badge-one">único</span>';
     const d=entry.intervalDays||30;
     const lbl=d<=7?`${d}d · semanal`:d<=14?`${d}d · quinzenal`:d<=31?`${d}d · mensal`:d<=62?`${d}d · bimestral`:d<=93?`${d}d · trimestral`:`${d}d`;
-    return `<span class="badge-rec">${lbl}</span>`;
+    let html=`<span class="badge-rec">${lbl}</span>`;
+    if(entry.endDate){
+      const ed=new Date(entry.endDate+'T12:00:00');
+      const fim=`${ed.getDate()} ${MESES[ed.getMonth()]}`;
+      html+=` <span class="badge-one">até ${fim}</span>`;
+    }
+    return html;
   }
 
   // Header
@@ -873,12 +882,14 @@ function openModal(mode, idx){
     document.getElementById('mDate').value=e.startDate;
     document.getElementById('mRecurring').checked=e.recurring===true;
     document.getElementById('mInterval').value=e.intervalDays||30;
+    document.getElementById('mEndDate').value=e.endDate||'';
   } else {
     document.getElementById('mName').value='';
     document.getElementById('mValue').value='';
     document.getElementById('mDate').value='';
     document.getElementById('mRecurring').checked=isExp; // despesa: default recorrente; ganho: default único
     document.getElementById('mInterval').value=30;
+    document.getElementById('mEndDate').value='';
   }
   syncPresets();
   onRecToggle();
@@ -891,6 +902,7 @@ function closeModal(){ document.getElementById('modalOverlay').classList.remove(
 function onRecToggle(){
   const rec=document.getElementById('mRecurring').checked;
   document.getElementById('intervalPanel').classList.toggle('show',rec);
+  document.getElementById('endDateField').style.display=rec?'flex':'none';
   if(rec) updateIntervalHint();
 }
 
@@ -929,8 +941,10 @@ function confirmEntry(){
   const startDate=document.getElementById('mDate').value;
   const recurring=document.getElementById('mRecurring').checked;
   const intervalDays=parseInt(document.getElementById('mInterval').value)||30;
+  const endDate=document.getElementById('mEndDate').value;
   if(!name||!value||!startDate){ alert('Preencha todos os campos.'); return; }
   const entry={name,value,startDate,recurring,intervalDays};
+  if(endDate) entry.endDate=endDate;
   const list=_modalMode==='exp'?state.expenses:state.extraIncomes;
   if(_editIdx>=0&&_editIdx<list.length) list[_editIdx]=entry;
   else list.push(entry);
