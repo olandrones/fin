@@ -245,12 +245,9 @@ input:checked + .slider::before { transform:translateX(18px); background:#fff; }
       <h3 style="margin:0;font-size:0.9rem;">📊 Visão compacta · 53 semanas</h3>
       <button onclick="toggleCompactPopup()" style="background:none;border:none;color:#777;cursor:pointer;font-size:1.2rem;">✕</button>
     </div>
-    <div class="chart-outer">
-      <div class="chart-months" id="compactChartMonths"></div>
-      <div style="display:flex;">
-        <div class="chart-spacer"></div>
-        <div class="chart-bars" id="compactChart" style="gap:3px;"><div class="zero-line" style="position:absolute;left:0;right:0;border-top:1px dashed #3a3a5a;z-index:0;pointer-events:none;bottom:50%;"></div></div>
-      </div>
+    <div class="chart-outer" style="flex-direction:column;gap:0;">
+      <div class="chart-months" id="compactChartMonths" style="margin-left:0;padding:0 0 8px 0;"></div>
+      <div class="chart-bars" id="compactChart" style="gap:5px;align-items:flex-end;"><div class="zero-line" style="position:absolute;left:0;right:0;border-top:1px dashed #3a3a5a;z-index:0;pointer-events:none;bottom:50%;"></div></div>
     </div>
   </div>
 </div>
@@ -669,12 +666,13 @@ function renderCompactChart(){
   let bal=sb;
   monthBars.forEach(m=>{ bal+=m.net; m.balance=bal; });
 
-  // Renderiza barra de meses (compacta, sem semanas)
+  // Renderiza barra de meses (alinhado com as barras, sem spacer)
   const monthBar=document.createElement('div');
-  monthBar.style.cssText='display:flex;flex:1;gap:2px;';
+  monthBar.style.cssText='display:flex;gap:5px;justify-content:flex-start;';
   const mesesCompacto=['Jun','Jul','Ago','Set','Out','Nov','Dez','Jan','Fev','Mar','Abr','Mai','Jun'];
   mesesCompacto.forEach((m,i)=>{
-    const wrap=document.createElement('div'); wrap.style.cssText='flex:1;padding:4px 0;text-align:center;font-size:0.7rem;color:#555;min-width:32px;';
+    const wrap=document.createElement('div');
+    wrap.style.cssText='flex:0 0 16px;text-align:center;font-size:0.65rem;color:#555;';
     wrap.textContent=m;
     monthBar.appendChild(wrap);
   });
@@ -688,15 +686,13 @@ function renderCompactChart(){
 
   monthBars.forEach((m,i)=>{
     const wrap=document.createElement('div');
-    wrap.style.cssText='flex:1;height:100%;position:relative;z-index:1;min-width:32px;';
-
-    const zl=chart.querySelector('.zero-line');
+    wrap.style.cssText='flex:0 0 16px;height:100%;position:relative;z-index:1;';
 
     // Ganhos (verde, pra cima)
     const incomePct=(m.income/ref)*pctBase;
     if(incomePct>0.5){
       const incomeBar=document.createElement('div');
-      incomeBar.style.cssText=`position:absolute;bottom:50%;height:${incomePct}%;width:calc(100% - 2px);left:1px;background:#4CAF50;border-radius:1px 1px 0 0;`;
+      incomeBar.style.cssText=`position:absolute;bottom:50%;height:${incomePct}%;width:100%;background:#4CAF50;border-radius:1px 1px 0 0;`;
       incomeBar.setAttribute('data-tip',`${mesesCompacto[i]}\nGanhos: ${R(m.income)}\nGastos: ${R(m.expense)}\nNet: ${R(m.net)}\nSaldo: ${R(m.balance)}`);
       wrap.appendChild(incomeBar);
     }
@@ -705,7 +701,7 @@ function renderCompactChart(){
     const expensePct=(m.expense/ref)*pctBase;
     if(expensePct>0.5){
       const expenseBar=document.createElement('div');
-      expenseBar.style.cssText=`position:absolute;bottom:calc(50% - ${expensePct}%);height:${expensePct}%;width:calc(100% - 2px);left:1px;background:#f44336;border-radius:0 0 1px 1px;`;
+      expenseBar.style.cssText=`position:absolute;bottom:calc(50% - ${expensePct}%);height:${expensePct}%;width:100%;background:#f44336;border-radius:0 0 1px 1px;`;
       expenseBar.setAttribute('data-tip',`${mesesCompacto[i]}\nGanhos: ${R(m.income)}\nGastos: ${R(m.expense)}\nNet: ${R(m.net)}\nSaldo: ${R(m.balance)}`);
       wrap.appendChild(expenseBar);
     }
