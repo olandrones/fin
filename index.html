@@ -224,7 +224,6 @@ input:checked + .slider::before { transform:translateX(18px); background:#fff; }
 <div class="scroll-area">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
     <div class="chart-title">Projeção do saldo · Jun/2026 – Jun/2027 · <span id="chartPeriodLabel">53 semanas</span></div>
-    <button onclick="toggleCompactPopup()" style="background:#1a1a35;border:1px solid #2a2a5a;color:#777;border-radius:7px;padding:6px 12px;cursor:pointer;font-size:0.75rem;">📊 Compacto</button>
   </div>
   <div class="chart-outer">
     <div class="chart-months" id="chartMonths"></div>
@@ -237,20 +236,6 @@ input:checked + .slider::before { transform:translateX(18px); background:#fff; }
 </div>
 
 <div class="note" id="footNote"></div>
-
-<!-- MODAL POPUP COMPACTO (gráfico por mês) -->
-<div class="modal-overlay" id="compactModal">
-  <div class="modal" style="max-width:90vw;max-height:80vh;overflow-y:auto;width:95%;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <h3 style="margin:0;font-size:0.9rem;">📊 Visão compacta · 53 semanas</h3>
-      <button onclick="toggleCompactPopup()" style="background:none;border:none;color:#777;cursor:pointer;font-size:1.2rem;">✕</button>
-    </div>
-    <div class="chart-outer" style="flex-direction:column;gap:0;">
-      <div class="chart-months" id="compactChartMonths" style="margin-left:0;padding:0 0 8px 0;"></div>
-      <div class="chart-bars" id="compactChart" style="gap:5px;align-items:flex-end;"><div class="zero-line" style="position:absolute;left:0;right:0;border-top:1px dashed #3a3a5a;z-index:0;pointer-events:none;bottom:50%;"></div></div>
-    </div>
-  </div>
-</div>
 
 <!-- MODAL UNIFICADO (despesa ou ganho) -->
 <div class="modal-overlay" id="modalOverlay">
@@ -622,12 +607,6 @@ function computeData(){
 }
 
 // ── COMPACT POPUP ────────────────────────────────────────────────────────────
-function toggleCompactPopup(){
-  const modal=document.getElementById('compactModal');
-  modal.classList.toggle('open');
-  if(modal.classList.contains('open')) renderCompactChart();
-}
-
 function togglePaid(expIdx){
   const exp=state.expenses[expIdx];
   if(!exp) return;
@@ -636,78 +615,6 @@ function togglePaid(expIdx){
   const totalInstallments=occurrences.length;
   exp.paid=(exp.paid+1)%(totalInstallments+1);
   onStateChange();
-}
-
-document.addEventListener('keydown', e => {
-  if(e.ctrlKey && e.code === 'KeyS'){ e.preventDefault(); toggleCompactPopup(); }
-});
-
-function renderCompactChart(){
-  const res=computeData(); const wd=res.wd;
-  const chart=document.getElementById('compactChart');
-  const monthsContainer=document.getElementById('compactChartMonths');
-
-  chart.innerHTML='<div class="zero-line" style="position:absolute;left:0;right:0;border-top:1px dashed #3a3a5a;z-index:0;pointer-events:none;bottom:50%;"></div>';
-  monthsContainer.innerHTML='';
-
-  // Agrega dados em 13 meses
-  const numMonths=13;
-  const monthBars=Array.from({length:numMonths},()=>({income:0,expense:0,net:0,balance:0}));
-  wd.forEach((w,i)=>{
-    const mIdx=Math.floor(i*12/wd.length);
-    if(mIdx<numMonths){
-      const income=w.income+w.vrIncome+w.extraIncome+w.loanIncome;
-      monthBars[mIdx].income+=income;
-      monthBars[mIdx].expense+=w.totalOut;
-      monthBars[mIdx].net+=w.net;
-    }
-  });
-  const sb=parseFloat(document.getElementById('startBalance').value)||0;
-  let bal=sb;
-  monthBars.forEach(m=>{ bal+=m.net; m.balance=bal; });
-
-  // Renderiza barra de meses (alinhado com as barras, sem spacer)
-  const monthBar=document.createElement('div');
-  monthBar.style.cssText='display:flex;gap:5px;justify-content:flex-start;';
-  const mesesCompacto=['Jun','Jul','Ago','Set','Out','Nov','Dez','Jan','Fev','Mar','Abr','Mai','Jun'];
-  mesesCompacto.forEach((m,i)=>{
-    const wrap=document.createElement('div');
-    wrap.style.cssText='flex:0 0 16px;text-align:center;font-size:0.65rem;color:#555;';
-    wrap.textContent=m;
-    monthBar.appendChild(wrap);
-  });
-  monthsContainer.appendChild(monthBar);
-
-  // Diverging bars: ganhos acima (verde), gastos abaixo (vermelho)
-  const maxIncome=Math.max(...monthBars.map(m=>m.income),1);
-  const maxExpense=Math.max(...monthBars.map(m=>m.expense),1);
-  const ref=Math.max(maxIncome,maxExpense)||1;
-  const pctBase=50;
-
-  monthBars.forEach((m,i)=>{
-    const wrap=document.createElement('div');
-    wrap.style.cssText='flex:0 0 16px;height:100%;position:relative;z-index:1;';
-
-    // Ganhos (verde, pra cima)
-    const incomePct=(m.income/ref)*pctBase;
-    if(incomePct>0.5){
-      const incomeBar=document.createElement('div');
-      incomeBar.style.cssText=`position:absolute;bottom:50%;height:${incomePct}%;width:100%;background:#4CAF50;border-radius:1px 1px 0 0;`;
-      incomeBar.setAttribute('data-tip',`${mesesCompacto[i]}\nGanhos: ${R(m.income)}\nGastos: ${R(m.expense)}\nNet: ${R(m.net)}\nSaldo: ${R(m.balance)}`);
-      wrap.appendChild(incomeBar);
-    }
-
-    // Gastos (vermelho, pra baixo)
-    const expensePct=(m.expense/ref)*pctBase;
-    if(expensePct>0.5){
-      const expenseBar=document.createElement('div');
-      expenseBar.style.cssText=`position:absolute;bottom:calc(50% - ${expensePct}%);height:${expensePct}%;width:100%;background:#f44336;border-radius:0 0 1px 1px;`;
-      expenseBar.setAttribute('data-tip',`${mesesCompacto[i]}\nGanhos: ${R(m.income)}\nGastos: ${R(m.expense)}\nNet: ${R(m.net)}\nSaldo: ${R(m.balance)}`);
-      wrap.appendChild(expenseBar);
-    }
-
-    chart.appendChild(wrap);
-  });
 }
 
 // ── RENDER ───────────────────────────────────────────────────────────────────
