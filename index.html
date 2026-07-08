@@ -378,7 +378,7 @@ let state = {
 // ── JSONBIN CONFIG ────────────────────────────────────────────────────────────
 // Preencha após criar o bin em jsonbin.io → Settings → X-Master-Key
 const JBIN_ID  = '6a2f6fb5f5f4af5e29f2c979';  // fin-financas · conta Renato
-const JBIN_KEY = '$2a$10$49Mn9kCZqBvzJnoagv3oqe/fMoSWr10EOLdq21CQnGlsSHWtZvOMm'; // dados_pessoais
+const JBIN_KEY = '$2a$10$g6jrm.ifugmyTO7nGzWKIue3Q4ypHTUTwrxhFciJF43NiplD8w9mG'; // dados_pessoais
 const JBIN_URL = ()=>`https://api.jsonbin.io/v3/b/${JBIN_ID}`;
 
 // ── SYNC DOM → STATE ─────────────────────────────────────────────────────────
@@ -707,11 +707,7 @@ function renderTable({wd,loanAmt}){
   const table=document.getElementById('mainTable'); table.innerHTML='';
   const N=weeks.length;
   const today=new Date(); today.setHours(0,0,0,0);
-  let startWeekIdx=0;
-  for(let i=0;i<N;i++){
-    const ws=new Date(WEEK_STARTS[i]); ws.setHours(0,0,0,0);
-    if(ws>=today){ startWeekIdx=i; break; }
-  }
+  const startWeekIdx=Math.max(0,getWeekIdx(today.getFullYear(),today.getMonth(),today.getDate()));
   const displayWeeks=weeks.slice(startWeekIdx);
   const displayWd=wd.slice(startWeekIdx);
 
