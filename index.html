@@ -528,6 +528,9 @@ function computeData(){
   const pmt=calcPMT(loanAmt,loanRate/100,loanN);
   let loanInstNum=0;
 
+  const today=new Date(); today.setHours(0,0,0,0);
+  const todayWeekIdx=Math.max(0,getWeekIdx(today.getFullYear(),today.getMonth(),today.getDate()));
+
   // Salários e VR fixos (day-of-month, hardcoded)
   // Demissão em 08/07/2026: Sal1/Sal2/Sal3/VR só existiram até jun/2026
   MONTHS.forEach(({y,m})=>{
@@ -537,13 +540,13 @@ function computeData(){
       const w3=getWeekIdx(y,m,30); if(w3>=0) wd[w3].income+=4047;
       const wv=getWeekIdx(y,m,30); if(wv>=0) wd[wv].vrIncome+=1221;
     }
-    // Parcelas empréstimo
+    // Parcelas empréstimo (a partir do mês corrente, entrada cai hoje)
     if(loanAmt>0&&loanInstNum<loanN){
       const wl=getWeekIdx(y,m,10);
-      if(wl>0) wd[wl].items.push({n:`Parcela Itaú (${++loanInstNum}/${loanN})`,v:pmt,isLoan:true});
+      if(wl>=todayWeekIdx) wd[wl].items.push({n:`Parcela Itaú (${++loanInstNum}/${loanN})`,v:pmt,isLoan:true});
     }
   });
-  if(loanAmt>0) wd[0].loanIncome=loanAmt;
+  if(loanAmt>0) wd[todayWeekIdx].loanIncome=loanAmt;
 
   // Despesas dinâmicas (startDate + intervalDays + endDate)
   state.expenses.forEach(exp=>{
@@ -561,13 +564,7 @@ function computeData(){
   });
 
   const sb=parseFloat(document.getElementById('startBalance').value)||0;
-  const today=new Date(); today.setHours(0,0,0,0);
-  let todayWeekIdx=-1;
-  for(let i=0;i<N;i++){
-    const ws=new Date(WEEK_STARTS[i]); ws.setHours(0,0,0,0);
-    if(ws<=today) todayWeekIdx=i;
-  }
-  let bal=sb;
+  let bal=sb+(loanAmt>0?loanAmt:0);
   wd.forEach((w,i)=>{
     w.totalOut=w.items.reduce((s,it)=>s+it.v,0);
     w.net=w.income+w.vrIncome+w.extraIncome+w.loanIncome-w.totalOut;
@@ -600,7 +597,7 @@ function computeData(){
     wd[wi].net      -= monthInt;
   });
   // Recalcula saldo com os juros incluídos (respeitando o ponto de partida "hoje")
-  let bal2 = sb;
+  let bal2 = sb+(loanAmt>0?loanAmt:0);
   wd.forEach((w,i) => {
     if(i>todayWeekIdx) bal2 += w.net;
     w.balance = bal2;
