@@ -543,7 +543,7 @@ function computeData(){
     // Parcelas empréstimo (a partir do mês corrente, entrada cai hoje)
     if(loanAmt>0&&loanInstNum<loanN){
       const wl=getWeekIdx(y,m,10);
-      if(wl>=todayWeekIdx) wd[wl].items.push({n:`Parcela Itaú (${++loanInstNum}/${loanN})`,v:pmt,isLoan:true});
+      if(wl>=todayWeekIdx){ loanInstNum++; wd[wl].items.push({n:'Empréstimo Dívida',v:pmt,isLoan:true}); }
     }
   });
   if(loanAmt>0) wd[todayWeekIdx].loanIncome=loanAmt;
@@ -797,7 +797,7 @@ function renderTable({wd,loanAmt}){
   const seenE=new Set(),allExp=[];
   displayWd.forEach(w=>w.items.forEach(it=>{ if(!seenE.has(it.n)){seenE.add(it.n);allExp.push(it.n);} }));
   allExp.forEach(name=>{
-    const isLoan=name.startsWith('Parcela Itaú');
+    const isLoan=name==='Empréstimo Dívida';
     const isInt =name.startsWith('Juros especial');
     const expIdx=state.expenses.findIndex(e=>e.name===name);
     const exp=expIdx>=0?state.expenses[expIdx]:null;
@@ -823,7 +823,8 @@ function renderTable({wd,loanAmt}){
       row.onclick=()=>togglePaid(expIdx);
       table.appendChild(row);
     } else {
-      table.appendChild(mkRow([{cls:'row-label sub',html:lbl},...displayWd.map(w=>{ const it=w.items.find(i=>i.n===name); return it?{cls:'sub-exp',text:'R$ '+BR(it.v)}:{cls:'sub-empty',text:'·'}; })]));
+      const cellCls = isInt?'sub-int':isLoan?'sub-loan':'sub-exp';
+      table.appendChild(mkRow([{cls:'row-label sub',html:lbl},...displayWd.map(w=>{ const it=w.items.find(i=>i.n===name); return it?{cls:cellCls,text:'R$ '+BR(it.v)}:{cls:'sub-empty',text:'·'}; })]));
     }
   });
 
